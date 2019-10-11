@@ -27,6 +27,22 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+class SessionContext:
+    # Patch for mocker requests
+    original_send = requests.Session.send
+    real_get_adapter = requests.Session.get_adapter
+    def __enter__(self):
+        self.old_original_send = requests.Session.send
+        self.old_real_get_adapter = requests.Session.get_adapter
+        requests.Session.send = SessionContext.original_send
+        requests.Session.get_adapter = SessionContext.real_get_adapter
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        requests.Session.send = self.old_original_send
+        requests.Session.get_adapter = self.old_real_get_adapter
+
+
 def _get_id(response):
     try:
         return _get_data(response)["id"]
@@ -126,12 +142,12 @@ class ReportPortalService(object):
         self.base_url = uri_join(self.endpoint,
                                  self.api_base,
                                  self.project)
-
-        self.session = requests.Session()
-        if retries:
-            self.session.mount('https://', HTTPAdapter(max_retries=retries))
-            self.session.mount('http://', HTTPAdapter(max_retries=retries))
-        self.session.headers["Authorization"] = "bearer {0}".format(self.token)
+        with SessionContext():
+            self.session = requests.Session()
+            if retries:
+                self.session.mount('https://', HTTPAdapter(max_retries=retries))
+                self.session.mount('http://', HTTPAdapter(max_retries=retries))
+            self.session.headers["Authorization"] = "bearer {0}".format(self.token)
         self.stack = [None]
         self.launch_id = None
         self.verify_ssl = verify_ssl
@@ -149,7 +165,8 @@ class ReportPortalService(object):
             "mode": mode
         }
         url = uri_join(self.base_url, "launch")
-        r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+        with SessionContext():
+            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
         self.launch_id = _get_id(r)
         self.stack.append(None)
         logger.debug("start_launch - Stack: %s", self.stack)
@@ -161,7 +178,8 @@ class ReportPortalService(object):
             "status": status
         }
         url = uri_join(self.base_url, "launch", self.launch_id, action)
-        r = self.session.put(url=url, json=data, verify=self.verify_ssl)
+        with SessionContext():
+            r = self.session.put(url=url, json=data, verify=self.verify_ssl)
         self.stack.pop()
         logger.debug("%s_launch - Stack: %s", action, self.stack)
         return _get_msg(r)
@@ -206,7 +224,8 @@ class ReportPortalService(object):
             url = uri_join(self.base_url, "item", parent_item_id)
         else:
             url = uri_join(self.base_url, "item")
-        r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+        with SessionContext():
+            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
 
         item_id = _get_id(r)
         self.stack.append(item_id)
@@ -226,13 +245,15 @@ class ReportPortalService(object):
         }
         item_id = self.stack.pop()
         url = uri_join(self.base_url, "item", item_id)
-        r = self.session.put(url=url, json=data, verify=self.verify_ssl)
+        with SessionContext():
+            r = self.session.put(url=url, json=data, verify=self.verify_ssl)
         logger.debug("finish_test_item - Stack: %s", self.stack)
         return _get_msg(r)
 
     def get_project_settings(self):
         url = uri_join(self.base_url, "settings")
-        r = self.session.get(url=url, json={}, verify=self.verify_ssl)
+        with SessionContext():
+            r = self.session.get(url=url, json={}, verify=self.verify_ssl)
         logger.debug("settings - Stack: %s", self.stack)
         return _get_json(r)
 
@@ -248,7 +269,8 @@ class ReportPortalService(object):
             return self.log_batch([data])
         else:
             url = uri_join(self.base_url, "log")
-            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+            with SessionContext():
+                r = self.session.post(url=url, json=data, verify=self.verify_ssl)
             logger.debug("log - Stack: %s", self.stack)
             return _get_id(r)
 
@@ -299,11 +321,12 @@ class ReportPortalService(object):
         from reportportal_client import POST_LOGBATCH_RETRY_COUNT
         for i in range(POST_LOGBATCH_RETRY_COUNT):
             try:
-                r = self.session.post(
-                    url=url,
-                    files=files,
-                    verify=self.verify_ssl
-                )
+                with SessionContext():
+                    r = self.session.post(
+                        url=url,
+                        files=files,
+                        verify=self.verify_ssl
+                    )
             except KeyError:
                 if i < POST_LOGBATCH_RETRY_COUNT - 1:
                     continue
