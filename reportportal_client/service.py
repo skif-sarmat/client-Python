@@ -25,48 +25,7 @@ from requests.adapters import HTTPAdapter
 from .errors import ResponseError, EntryCreatedError, OperationCompletionError
 
 logger = logging.getLogger(__name__)
-#logger.addHandler(logging.NullHandler())
-lock = threading.Lock()
-original_send = requests.Session.send
-real_get_adapter = requests.Session.get_adapter
-
-
-class SessionContext:
-    # Patch for mocker requests
-    def __init__(self):
-        self._last_send = None
-
-    def start(self):
-        if self._last_send:
-            raise RuntimeError('SessionContext has already been started')
-
-        self._last_send = requests.Session.send
-
-        def _fake_send(session, request, **kwargs):
-            old_real_get_adapter = requests.Session.get_adapter
-            requests.Session.get_adapter = real_get_adapter
-            ret = original_send(session, request, **kwargs)
-            requests.Session.get_adapter = old_real_get_adapter
-            return ret
-
-        requests.Session.send = _fake_send
-
-    def __enter__(self):
-        return self
-
-        #
-        # lock.acquire()
-        # self.start()
-        # return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-        # if self._last_send:
-        #     requests.Session.send = self._last_send
-        #     self._last_send = None
-        #
-        # lock.release()
-
+logger.addHandler(logging.NullHandler())
 
 def _get_id(response):
     try:
@@ -167,12 +126,11 @@ class ReportPortalService(object):
         self.base_url = uri_join(self.endpoint,
                                  self.api_base,
                                  self.project)
-        with SessionContext():
-            self.session = requests.Session()
-            if retries:
-                self.session.mount('https://', HTTPAdapter(max_retries=retries))
-                self.session.mount('http://', HTTPAdapter(max_retries=retries))
-            self.session.headers["Authorization"] = "bearer {0}".format(self.token)
+        self.session = requests.Session()
+        if retries:
+            self.session.mount('https://', HTTPAdapter(max_retries=retries))
+            self.session.mount('http://', HTTPAdapter(max_retries=retries))
+        self.session.headers["Authorization"] = "bearer {0}".format(self.token)
         self.stack = [None]
         self.launch_id = None
         self.verify_ssl = verify_ssl
@@ -190,8 +148,8 @@ class ReportPortalService(object):
             "mode": mode
         }
         url = uri_join(self.base_url, "launch")
-        with SessionContext():
-            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+
+        r = self.session.post(url=url, json=data, verify=self.verify_ssl)
         self.launch_id = _get_id(r)
         self.stack.append(None)
         logger.debug("start_launch - Stack: %s", self.stack)
@@ -203,8 +161,8 @@ class ReportPortalService(object):
             "status": status
         }
         url = uri_join(self.base_url, "launch", self.launch_id, action)
-        with SessionContext():
-            r = self.session.put(url=url, json=data, verify=self.verify_ssl)
+        
+        r = self.session.put(url=url, json=data, verify=self.verify_ssl)
         self.stack.pop()
         logger.debug("%s_launch - Stack: %s", action, self.stack)
         return _get_msg(r)
@@ -249,8 +207,8 @@ class ReportPortalService(object):
             url = uri_join(self.base_url, "item", parent_item_id)
         else:
             url = uri_join(self.base_url, "item")
-        with SessionContext():
-            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+        
+        r = self.session.post(url=url, json=data, verify=self.verify_ssl)
 
         item_id = _get_id(r)
         self.stack.append(item_id)
@@ -270,15 +228,15 @@ class ReportPortalService(object):
         }
         item_id = self.stack.pop()
         url = uri_join(self.base_url, "item", item_id)
-        with SessionContext():
-            r = self.session.put(url=url, json=data, verify=self.verify_ssl)
+
+        r = self.session.put(url=url, json=data, verify=self.verify_ssl)
         logger.debug("finish_test_item - Stack: %s", self.stack)
         return _get_msg(r)
 
     def get_project_settings(self):
         url = uri_join(self.base_url, "settings")
-        with SessionContext():
-            r = self.session.get(url=url, json={}, verify=self.verify_ssl)
+
+        r = self.session.get(url=url, json={}, verify=self.verify_ssl)
         logger.debug("settings - Stack: %s", self.stack)
         return _get_json(r)
 
@@ -294,8 +252,8 @@ class ReportPortalService(object):
             return self.log_batch([data])
         else:
             url = uri_join(self.base_url, "log")
-            with SessionContext():
-                r = self.session.post(url=url, json=data, verify=self.verify_ssl)
+
+            r = self.session.post(url=url, json=data, verify=self.verify_ssl)
             logger.debug("log - Stack: %s", self.stack)
             return _get_id(r)
 
@@ -346,12 +304,11 @@ class ReportPortalService(object):
         from reportportal_client import POST_LOGBATCH_RETRY_COUNT
         for i in range(POST_LOGBATCH_RETRY_COUNT):
             try:
-                with SessionContext():
-                    r = self.session.post(
-                        url=url,
-                        files=files,
-                        verify=self.verify_ssl
-                    )
+                r = self.session.post(
+                    url=url,
+                    files=files,
+                    verify=self.verify_ssl
+                )
             except KeyError:
                 if i < POST_LOGBATCH_RETRY_COUNT - 1:
                     continue

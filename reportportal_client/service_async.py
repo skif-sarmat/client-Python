@@ -17,7 +17,6 @@ import threading
 import multiprocessing
 import logging
 
-#from six.moves import queue
 from multiprocessing import Queue
 
 from .service import ReportPortalService
@@ -49,7 +48,6 @@ class QueueListener(object):
         items to process.
         """
         self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,), daemon=True)
-        #t.setDaemon(True)
         p.start()
 
     def prepare(self, record):
@@ -63,13 +61,9 @@ class QueueListener(object):
 
     def handle(self, record):
         """Handle an item.
-
-        This just loops through the handlers offering them the record
-        to handle.
         """
-        #record = self.prepare(record)
-        #for handler in self.handlers:
         self.client.process_item(record)
+    
     @staticmethod
     def _monitor(_self):
         """Monitor the queue for items, and ask the handler to deal with them.
