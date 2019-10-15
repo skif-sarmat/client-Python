@@ -47,7 +47,11 @@ class QueueListener(object):
         This starts up a background thread to monitor the queue for
         items to process.
         """
-        self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,), daemon=True)
+        if sys.version_info.major == 2:
+            self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,))
+            p.setDaemon(True)
+        elif sys.version_info.major == 3:
+            self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,), daemon=True)
         p.start()
 
     def prepare(self, record):
