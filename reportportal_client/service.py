@@ -18,6 +18,7 @@ import json
 import requests
 import uuid
 import logging
+import threading
 
 from requests.adapters import HTTPAdapter
 
@@ -26,22 +27,42 @@ from .errors import ResponseError, EntryCreatedError, OperationCompletionError
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+lock = threading.Lock()
+original_send = requests.Session.send
+real_get_adapter = requests.Session.get_adapter
+
 
 class SessionContext:
     # Patch for mocker requests
-    original_send = requests.Session.send
-    real_get_adapter = requests.Session.get_adapter
+    def __init__(self):
+        self._last_send = None
+
+    def start(self):
+        if self._last_send:
+            raise RuntimeError('SessionContext has already been started')
+
+        self._last_send = requests.Session.send
+
+        def _fake_send(session, request, **kwargs):
+            old_real_get_adapter = requests.Session.get_adapter
+            requests.Session.get_adapter = real_get_adapter
+            ret = original_send(session, request, **kwargs)
+            requests.Session.get_adapter = old_real_get_adapter
+            return ret
+
+        requests.Session.send = _fake_send
+
     def __enter__(self):
-        self.old_original_send = requests.Session.send
-        self.old_real_get_adapter = requests.Session.get_adapter
-        requests.Session.send = SessionContext.original_send
-        requests.Session.get_adapter = SessionContext.real_get_adapter
+        lock.acquire()
+        self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        requests.Session.send = self.old_original_send
-        requests.Session.get_adapter = self.old_real_get_adapter
+        if self._last_send:
+            requests.Session.send = self._last_send
+            self._last_send = None
 
+        lock.release()
 
 def _get_id(response):
     try:
