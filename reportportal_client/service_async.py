@@ -14,9 +14,11 @@
 
 import sys
 import threading
+import multiprocessing
 import logging
 
-from six.moves import queue
+#from six.moves import queue
+from multiprocessing import Queue
 
 from .service import ReportPortalService
 from .errors import Error
@@ -28,13 +30,13 @@ logger.addHandler(logging.NullHandler())
 class QueueListener(object):
     _sentinel_item = None
 
-    def __init__(self, queue, *handlers, **kwargs):
+    def __init__(self, queue, client, **kwargs):
         self.queue = queue
         self.queue_get_timeout = kwargs.get("queue_get_timeout", None)
-        self.handlers = handlers
-        self._stop_nowait = threading.Event()
-        self._stop = threading.Event()
-        self._thread = None
+        self.client = client
+        self._stop_nowait = multiprocessing.Event()
+        self._stop = multiprocessing.Event()
+        self._proccess= None
 
     def dequeue(self, block=True):
         """Dequeue a record and return item."""
@@ -46,9 +48,9 @@ class QueueListener(object):
         This starts up a background thread to monitor the queue for
         items to process.
         """
-        self._thread = t = threading.Thread(target=self._monitor)
-        t.setDaemon(True)
-        t.start()
+        self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,), daemon=True)
+        #t.setDaemon(True)
+        p.start()
 
     def prepare(self, record):
         """Prepare a record for handling.
@@ -65,11 +67,11 @@ class QueueListener(object):
         This just loops through the handlers offering them the record
         to handle.
         """
-        record = self.prepare(record)
-        for handler in self.handlers:
-            handler(record)
-
-    def _monitor(self):
+        #record = self.prepare(record)
+        #for handler in self.handlers:
+        self.client.process_item(record)
+    @staticmethod
+    def _monitor(_self):
         """Monitor the queue for items, and ask the handler to deal with them.
 
         This method runs on a separate, internal thread.
@@ -77,33 +79,33 @@ class QueueListener(object):
         """
         err_msg = ("invalid internal state:"
                    " _stop_nowait can not be set if _stop is not set")
-        assert self._stop.isSet() or not self._stop_nowait.isSet(), err_msg
+        assert _self._stop.is_set() or not _self._stop_nowait.is_set(), err_msg
 
-        q = self.queue
+        q = _self.queue
         has_task_done = hasattr(q, 'task_done')
-        while not self._stop.isSet():
+        while not _self._stop.is_set():
             try:
-                record = self.dequeue(True)
-                if record is self._sentinel_item:
+                record = _self.dequeue(True)
+                if record is _self._sentinel_item:
                     break
-                self.handle(record)
+                _self.handle(record)
                 if has_task_done:
                     q.task_done()
-            except queue.Empty:
-                pass
+            except Exception:
+                logger.exception("_monitor")
 
         # There might still be records in the queue,
         # handle then unless _stop_nowait is set.
-        while not self._stop_nowait.isSet():
+        while not _self._stop_nowait.is_set():
             try:
-                record = self.dequeue(False)
-                if record is self._sentinel_item:
+                record = _self.dequeue(False)
+                if record is _self._sentinel_item:
                     break
-                self.handle(record)
+                _self.handle(record)
                 if has_task_done:
                     q.task_done()
-            except queue.Empty:
-                break
+            except Exception:
+                logger.exception("_monitor")
 
     def stop(self, nowait=False):
         """Stop the listener.
@@ -120,10 +122,10 @@ class QueueListener(object):
         if nowait:
             self._stop_nowait.set()
         self.queue.put_nowait(self._sentinel_item)
-        if (self._thread.isAlive() and
-                self._thread is not threading.currentThread()):
-            self._thread.join()
-        self._thread = None
+        if (self._proccess.is_alive() and
+                self._proccess  is not multiprocessing.current_process()):
+            self._proccess .join()
+        self._proccess = None
 
 
 class ReportPortalServiceAsync(object):
@@ -161,11 +163,11 @@ class ReportPortalServiceAsync(object):
         self.supported_methods = ["start_launch", "finish_launch",
                                   "start_test_item", "finish_test_item", "log"]
 
-        self.queue = queue.Queue()
-        self.listener = QueueListener(self.queue, self.process_item,
+        self.queue = Queue()
+        self.listener = QueueListener(self.queue, self,
                                       queue_get_timeout=queue_get_timeout)
         self.listener.start()
-        self.lock = threading.Lock()
+        self.lock = multiprocessing.Lock()
 
     def terminate(self, nowait=False):
         """Finalize and stop service

@@ -25,8 +25,7 @@ from requests.adapters import HTTPAdapter
 from .errors import ResponseError, EntryCreatedError, OperationCompletionError
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
-
+#logger.addHandler(logging.NullHandler())
 lock = threading.Lock()
 original_send = requests.Session.send
 real_get_adapter = requests.Session.get_adapter
@@ -53,16 +52,21 @@ class SessionContext:
         requests.Session.send = _fake_send
 
     def __enter__(self):
-        lock.acquire()
-        self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._last_send:
-            requests.Session.send = self._last_send
-            self._last_send = None
+        #
+        # lock.acquire()
+        # self.start()
+        # return self
 
-        lock.release()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+        # if self._last_send:
+        #     requests.Session.send = self._last_send
+        #     self._last_send = None
+        #
+        # lock.release()
+
 
 def _get_id(response):
     try:
