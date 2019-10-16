@@ -34,7 +34,7 @@ class QueueListener(object):
         self.client = client
         self._stop_nowait = multiprocessing.Event()
         self._stop = multiprocessing.Event()
-        self._proccess= None
+        self._proccess = None
 
     def dequeue(self, block=True):
         """Dequeue a record and return item."""
@@ -63,7 +63,7 @@ class QueueListener(object):
         """Handle an item.
         """
         self.client.process_item(record)
-    
+
     @staticmethod
     def _monitor(_self):
         """Monitor the queue for items, and ask the handler to deal with them.

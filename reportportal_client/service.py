@@ -18,7 +18,6 @@ import json
 import requests
 import uuid
 import logging
-import threading
 
 from requests.adapters import HTTPAdapter
 
@@ -26,6 +25,7 @@ from .errors import ResponseError, EntryCreatedError, OperationCompletionError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
 
 def _get_id(response):
     try:
@@ -161,7 +161,7 @@ class ReportPortalService(object):
             "status": status
         }
         url = uri_join(self.base_url, "launch", self.launch_id, action)
-        
+
         r = self.session.put(url=url, json=data, verify=self.verify_ssl)
         self.stack.pop()
         logger.debug("%s_launch - Stack: %s", action, self.stack)
@@ -207,7 +207,7 @@ class ReportPortalService(object):
             url = uri_join(self.base_url, "item", parent_item_id)
         else:
             url = uri_join(self.base_url, "item")
-        
+
         r = self.session.post(url=url, json=data, verify=self.verify_ssl)
 
         item_id = _get_id(r)

@@ -34,4 +34,3 @@ class TestQueueListener:
         queue.put_nowait('Message')
 
         assert queue.empty()
-
