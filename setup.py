@@ -16,4 +16,6 @@ setup(
     keywords=['testing', 'reporting', 'reportportal'],
     classifiers=[],
     install_requires=['requests>=2.4.2', 'six'],
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
 )

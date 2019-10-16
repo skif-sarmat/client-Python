@@ -4,3 +4,4 @@ dist
 MANIFEST
 reportportal_client.egg-info
 *.pyc
+.pytest_cache
