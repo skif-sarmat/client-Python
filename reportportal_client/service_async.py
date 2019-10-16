@@ -115,6 +115,7 @@ class QueueListener(object):
         self._stop.set()
         if nowait:
             self._stop_nowait.set()
+        # TODO: seems like bug: need to add two sentinel_items
         self.queue.put_nowait(self._sentinel_item)
         if (self._proccess.is_alive() and
                 self._proccess is not multiprocessing.current_process()):
