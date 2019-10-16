@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import sys
-import threading
 import multiprocessing
 import logging
 
@@ -44,11 +43,11 @@ class QueueListener(object):
     def start(self):
         """Start the listener.
 
-        This starts up a background thread to monitor the queue for
+        This starts up a background process to monitor the queue for
         items to process.
         """
         self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,))
-        daemon = True
+        p.daemon = True
         p.start()
 
     def prepare(self, record):
@@ -69,8 +68,8 @@ class QueueListener(object):
     def _monitor(_self):
         """Monitor the queue for items, and ask the handler to deal with them.
 
-        This method runs on a separate, internal thread.
-        The thread will terminate if it sees a sentinel object in the queue.
+        This method runs on a separate process.
+        The process will terminate if it sees a sentinel object in the queue.
         """
         err_msg = ("invalid internal state:"
                    " _stop_nowait can not be set if _stop is not set")
@@ -105,12 +104,12 @@ class QueueListener(object):
     def stop(self, nowait=False):
         """Stop the listener.
 
-        This asks the thread to terminate, and then waits for it to do so.
+        This asks the process to terminate, and then waits for it to do so.
         Note that if you don't call this before your application exits, there
         may be some records still left on the queue, which won't be processed.
-        If nowait is False then thread will handle remaining items in queue and
+        If nowait is False then process will handle remaining items in queue and
         stop.
-        If nowait is True then thread will be stopped even if the queue still
+        If nowait is True then process will be stopped even if the queue still
         contains items.
         """
         self._stop.set()
@@ -118,8 +117,8 @@ class QueueListener(object):
             self._stop_nowait.set()
         self.queue.put_nowait(self._sentinel_item)
         if (self._proccess.is_alive() and
-                self._proccess  is not multiprocessing.current_process()):
-            self._proccess .join()
+                self._proccess is not multiprocessing.current_process()):
+            self._proccess.join()
         self._proccess = None
 
 
