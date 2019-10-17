@@ -118,6 +118,9 @@ class QueueListener(object):
         if nowait:
             self._stop_nowait.set()
         self.queue.put_nowait(self._sentinel_item)
+        self.queue.put_nowait(self._sentinel_item)
+        # Add second sentinel item to prevent process stuck
+        # when queue is empty
         if (self._proccess.is_alive() and
                 self._proccess is not multiprocessing.current_process()):
             self._proccess.join()
