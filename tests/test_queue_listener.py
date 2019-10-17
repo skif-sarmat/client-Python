@@ -18,7 +18,6 @@ def queue_listener(queue):
     yield ql
     if ql._proccess is not None:
         ql.stop()
-        print('stop it')
 
 
 class TestQueueListener:
