@@ -30,7 +30,7 @@ class TestQueueListener:
 
         assert queue_listener._proccess is None
 
-    def test_monitor__send_message__message_consumed(self, queue_listener, queue):
+    def test_monitor__send_message__message_consumed(self, queue_listener, queue):  # noqa
         queue.put_nowait('Message')
 
         assert queue.empty()

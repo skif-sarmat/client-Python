@@ -46,7 +46,9 @@ class QueueListener(object):
         This starts up a background process to monitor the queue for
         items to process.
         """
-        self._proccess = p = multiprocessing.Process(target=QueueListener._monitor, args=(self,))
+        self._proccess = p = multiprocessing.Process(
+            target=QueueListener._monitor, args=(self,)
+        )
         p.daemon = True
         p.start()
 
@@ -107,15 +109,14 @@ class QueueListener(object):
         This asks the process to terminate, and then waits for it to do so.
         Note that if you don't call this before your application exits, there
         may be some records still left on the queue, which won't be processed.
-        If nowait is False then process will handle remaining items in queue and
-        stop.
+        If nowait is False then process will handle remaining items in queue
+        and stop.
         If nowait is True then process will be stopped even if the queue still
         contains items.
         """
         self._stop.set()
         if nowait:
             self._stop_nowait.set()
-        # TODO: seems like bug: need to add two sentinel_items
         self.queue.put_nowait(self._sentinel_item)
         if (self._proccess.is_alive() and
                 self._proccess is not multiprocessing.current_process()):
