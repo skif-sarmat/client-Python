@@ -1,6 +1,6 @@
 from multiprocessing import Queue
-from unittest import mock
 
+import mock
 import pytest
 
 from reportportal_client.service_async import QueueListener
