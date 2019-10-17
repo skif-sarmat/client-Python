@@ -12,6 +12,7 @@ install:
   - pip install pycodestyle
 before_script:
   - pycodestyle .
+  - python setup.py pytest
 script:
   - python setup.py -q install
 jobs:
