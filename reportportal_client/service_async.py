@@ -87,7 +87,7 @@ class QueueListener(object):
                 _self.handle(record)
                 if has_task_done:
                     q.task_done()
-            except Exception:
+            except multiprocessing.TimeoutError:
                 logger.exception("_monitor")
 
         # There might still be records in the queue,
@@ -100,7 +100,7 @@ class QueueListener(object):
                 _self.handle(record)
                 if has_task_done:
                     q.task_done()
-            except Exception:
+            except multiprocessing.TimeoutError:
                 logger.exception("_monitor")
 
     def stop(self, nowait=False):
